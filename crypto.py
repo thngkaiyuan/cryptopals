@@ -86,6 +86,14 @@ def aes_cbc_decrypt(aes, iv, bytes):
     blks = [iv] + chop(bytes, aes.block_size)
     return b''.join([xor_bytes(aes.decrypt(blks[i]), blks[i-1]) for i in range(1, len(blks))])
 
+def aes_ecb_encrypt(aes, pt):
+    assert len(pt) % aes.block_size == 0
+    return b''.join([aes.encrypt(blk) for blk in chop(pt, aes.block_size)])
+
+def aes_ecb_decrypt(aes, ct):
+    assert len(ct) % aes.block_size == 0
+    return b''.join([aes.decrypt(blk) for blk in chop(ct, aes.block_size)])
+
 def detect_blk_enc_mode(encryption_oracle, blk_size):
     return 'ECB' if has_repeated_blocks(encryption_oracle(b'A'*blk_size*3), blk_size) else 'CBC'
 
