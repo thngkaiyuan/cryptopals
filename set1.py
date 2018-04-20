@@ -12,7 +12,7 @@ print(xor_bytes(bytes.fromhex('1c0111001f010100061a024b53535009181c'), bytes.fro
 print(get_top_n([xor_byte(bytes.fromhex('1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736'), i).decode('latin-1') for i in range(256)], 1))
 
 #4
-with open('4.txt','r') as f:
+with open('data/4.txt','r') as f:
     s = f.readlines()
 texts = []
 for hex_str in s:
@@ -24,7 +24,7 @@ print(get_top_n(texts, 1))
 print(rep_xor(b"Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal", b"ICE").hex())
 
 #6
-with open('6.txt') as f:
+with open('data/6.txt') as f:
     c = b64decode(f.read().replace('\n', ''))
 ks = guess_rep_xor_key_size(c, 2, 42)
 blks = list(zip_longest(*chop(c, ks)))
@@ -38,13 +38,13 @@ print(key)
 print(rep_xor(c, bytes(key, 'latin-1')))
 
 #7
-with open('7.txt') as f:
+with open('data/7.txt') as f:
     c = b64decode(f.read().replace('\n', ''))
 aes = AES.new('YELLOW SUBMARINE')
 print(aes.decrypt(c))
 
 #8
-with open('8.txt') as f:
+with open('data/8.txt') as f:
     cts = [bytes.fromhex(line.strip()) for line in f.readlines()]
 for ct in cts:
     if has_repeated_blocks(ct, 16):

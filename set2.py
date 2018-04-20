@@ -7,7 +7,7 @@ print(pkcs7_pad(b'YELLOW SUBMARINE', 20))
 
 #10
 aes = AES.new('YELLOW SUBMARINE')
-with open('10.txt') as f:
+with open('data/10.txt') as f:
     ct = b64decode(f.read().replace('\n', ''))
 text = pkcs7_unpad(aes_cbc_decrypt(aes, b'\x00' * aes.block_size, ct))
 print(text)
