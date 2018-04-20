@@ -2,6 +2,7 @@ from base64 import b64encode, b64decode
 from ngram_score import ngram_score
 from itertools import combinations
 from Crypto.Util.number import bytes_to_long, long_to_bytes
+from Crypto.Cipher import AES
 
 monogram = ngram_score('english_monograms.txt')
 quadgram = ngram_score('english_quadgrams.txt')
@@ -61,3 +62,81 @@ def has_repeated_blocks(c, blocksize):
             if blks[i] == blks[j]:
                 return True
     return False
+
+def pkcs7_pad(_bytes, blocksize):
+    padding_size = blocksize - (len(_bytes) % blocksize)
+    return _bytes + bytes([padding_size] * padding_size)
+
+def pkcs7_unpad(_bytes):
+    padding_size = _bytes[-1]
+    assert _bytes[-padding_size:] == bytes([padding_size] * padding_size)
+    return _bytes[:-padding_size]
+
+''' Returns AES-CBC encrypted ciphertext without IV '''
+def aes_cbc_encrypt(aes, iv, bytes):
+    assert len(iv) == aes.block_size and len(bytes) % aes.block_size == 0
+    blks = [iv]
+    for blk in chop(bytes, aes.block_size):
+        blks.append(aes.encrypt(xor_bytes(blk, blks[-1])))
+    return b''.join(blks[1:])
+
+''' Takes as input ciphertext bytes separate from the IV '''
+def aes_cbc_decrypt(aes, iv, bytes):
+    assert len(iv) == aes.block_size and len(bytes) % aes.block_size == 0
+    blks = [iv] + chop(bytes, aes.block_size)
+    return b''.join([xor_bytes(aes.decrypt(blks[i]), blks[i-1]) for i in range(1, len(blks))])
+
+def detect_blk_enc_mode(encryption_oracle, blk_size):
+    return 'ECB' if has_repeated_blocks(encryption_oracle(b'A'*blk_size*3), blk_size) else 'CBC'
+
+def detect_blk_size(encryption_oracle):
+    orig_ct_len, test = len(encryption_oracle(b'')), b'A'
+    while len(encryption_oracle(test)) == orig_ct_len:
+        test += b'A'
+    return len(encryption_oracle(test)) - orig_ct_len
+
+def ecb_decrypt_appended_bytes(ecb_encryption_oracle):
+    blk_size = detect_blk_size(ecb_encryption_oracle)
+    assert detect_blk_enc_mode(ecb_encryption_oracle, blk_size) == 'ECB'
+
+    ''' Find the insertion point of our input '''
+    bef, aft = chop(ecb_encryption_oracle(b''), blk_size), chop(ecb_encryption_oracle(b'A'), blk_size)
+    start_blk = None
+    for i in range(len(bef)):
+        if bef[i] == aft[i]: continue
+        else:
+            start_blk = i
+            break
+
+    ''' If start_blk is None -> b'A' is appended to plaintext -> nothing is appended '''
+    if start_blk is None:
+        return b''
+
+    ''' We need to know how much to pad to control the block after start_blk '''
+    test = b'A' * 2 * blk_size
+    while not has_repeated_blocks(ecb_encryption_oracle(test), blk_size):
+        test += b'A'
+    left_padding = b'A' * (len(test) - 2 * blk_size)
+    if left_padding == b'':
+        start_blk -= 1
+
+    ''' Discover the length of the appended secret '''
+    test, orig_ct = left_padding, ecb_encryption_oracle(left_padding)
+    while len(ecb_encryption_oracle(test)) == len(orig_ct):
+        test += b'A'
+    secret_len = (len(orig_ct)//blk_size - (start_blk + 1)) * blk_size - (len(test) - len(left_padding))
+
+    ''' Bruteforce the secret, byte by byte '''
+    secret_blocks = -(-secret_len // blk_size)
+    test = left_padding + b'A' * secret_blocks * blk_size
+    ctrl_blk = start_blk + secret_blocks
+    secret = b''
+    for _ in range(secret_len):
+        test = test[:-1]
+        needle = chop(ecb_encryption_oracle(test), blk_size)[ctrl_blk]
+        for b in range(256):
+            test_in = test + secret + bytes([b])
+            if chop(ecb_encryption_oracle(test_in), blk_size)[ctrl_blk] == needle:
+                secret += bytes([b])
+                break
+    return secret
