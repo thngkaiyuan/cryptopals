@@ -148,3 +148,42 @@ def ecb_decrypt_appended_bytes(ecb_encryption_oracle):
                 secret += bytes([b])
                 break
     return secret
+
+def cbc_padding_oracle_attack(oracle, iv, ct, blk_size):
+    blocks = [iv] + chop(ct, blk_size)
+    num_blocks = len(blocks)
+    decrypted_blks = [None for _ in range(num_blocks - 1)]
+    for i in range(num_blocks - 2, -1, -1):
+        decrypted_blk = [b'\x00' for _ in range(blk_size)]
+        for j in range(blk_size - 1, -1, -1):
+            xs = []
+            should_mutate_second_byte = False
+            while len(xs) != 1:
+                xs.clear()
+                pad_len = blk_size - j
+                desired_padding = pkcs7_pad(b'\x00' * (blk_size - pad_len), blk_size)
+                decrypted_blk_bytes = b''.join(decrypted_blk)
+                for b in range(256):
+                    test_blk = b'\x00' * j + bytes([b]) + b'\x00' * (blk_size - j - 1)
+                    if should_mutate_second_byte:
+                        test_blk = xor_bytes(test_blk, b'\x00' * (blk_size - 2) + b'\xFF\x00')
+                    test_blks = blocks[::]
+                    test_blks[i] = xor_bytes(test_blk, xor_bytes(desired_padding, xor_bytes(decrypted_blk_bytes, blocks[i])))
+                    if oracle(test_blks[0], b''.join(test_blks[1:])):
+                        xs.append(bytes([b]))
+
+                '''
+                The first byte is a bit trickier, since we can have 
+                xx ... xx 01, xx ... 02 02 (if second byte is 02), etc.
+                Hence, we mutate the second last byte to break the chain.
+                E.g. xx ... 02 yy -> xx ... FD yy so that only xx ... FD 01 would be
+                a valid padding
+                '''
+                if j == blk_size - 1 and len(xs) > 1 and not should_mutate_second_byte:
+                    should_mutate_second_byte = True
+
+            decrypted_blk[j] = xs[0]
+        decrypted_blks[i] = b''.join(decrypted_blk)
+        blocks = blocks[:-1]
+    return b''.join(decrypted_blks)
+        
