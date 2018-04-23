@@ -3,6 +3,9 @@ from ngram_score import ngram_score
 from itertools import combinations
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Cipher import AES
+from collections import Counter as ctr
+from itertools import permutations
+from string import ascii_letters
 
 monogram = ngram_score('english_monograms.txt')
 quadgram = ngram_score('english_quadgrams.txt')
@@ -186,4 +189,19 @@ def cbc_padding_oracle_attack(oracle, iv, ct, blk_size):
         decrypted_blks[i] = b''.join(decrypted_blk)
         blocks = blocks[:-1]
     return b''.join(decrypted_blks)
-        
+
+def get_many_time_padded_key(ct, *args):
+    max_len = max(map(len, ct))
+    key = [0 for _ in range(max_len)]
+    for i in range(max_len):
+        eligible_ciphertexts = filter(lambda c: len(c) > i, ct)
+        '''
+        For each c[i], we guess that it is a space and add c[i] ^ SPACE
+        into the counter for each ascii letter it reveals in another ciphertext
+        '''
+        most_common_candidates = ctr(c[i] ^ ord(' ') for c, d in permutations(eligible_ciphertexts, 2) if chr(c[i] ^ d[i] ^ ord(' ')) in ascii_letters).most_common(1)
+        key[i] = most_common_candidates[0][0] if most_common_candidates else 0
+    if args:
+        for i in args[0]:
+            key[i] = args[0][i]
+    return b''.join(map(lambda k: bytes([k]), key))
