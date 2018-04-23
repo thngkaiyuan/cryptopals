@@ -75,8 +75,16 @@ SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0
 SW4gdGhlIGNhc3VhbCBjb21lZHk7
 SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=
 VHJhbnNmb3JtZWQgdXR0ZXJseTo=
-QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4='''.split('\n')], key = lambda ct: len(ct))
+QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4='''.split('\n')], key = len)
 
 key = get_many_time_padded_key(ct, {0:2, 30:16, 31:72, 33:228, 34:120, 35:153, 36:157, 37:135})
+for c in ct:
+    print(xor_bytes(key, c))
+
+#20
+with open('data/20.txt') as f:
+    ct = sorted([aes_ctr_enc(b64decode(line.strip())) for line in f.readlines()], key = len)
+
+key = get_many_time_padded_key_statistically(ct, {96:100, 101:218, 105:32, 106:0xe5, 107:0xfc, 108:0x19, 109:0xf9, 110:0x55, 111:0xf5, 112:0x73, 113:0xdf, 114:0xd3, 115:0xff, 116:0x1b, 117:0x47})
 for c in ct:
     print(xor_bytes(key, c))

@@ -205,3 +205,14 @@ def get_many_time_padded_key(ct, *args):
         for i in args[0]:
             key[i] = args[0][i]
     return b''.join(map(lambda k: bytes([k]), key))
+
+def get_many_time_padded_key_statistically(ct, *args):
+    max_len = max(map(len, ct))
+    key = [0 for _ in range(max_len)]
+    for i in range(max_len):
+        eligible_ciphertexts = list(filter(lambda c: len(c) > i, ct))
+        key[i] = get_top_n([''.join([chr(c[i] ^ b) for c in eligible_ciphertexts]) for b in range(256)], n = 1, enum = True, use_monogram = True)[0][2]
+    if args:
+        for i in args[0]:
+            key[i] = args[0][i]
+    return b''.join(map(lambda k: bytes([k]), key))
