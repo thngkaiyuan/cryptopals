@@ -1,14 +1,49 @@
+import os
+from math import log10
 from base64 import b64encode, b64decode
-from ngram_score import ngram_score
 from itertools import combinations
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 from Crypto.Cipher import AES
 from collections import Counter as ctr
 from itertools import permutations
-from string import ascii_letters
+from string import ascii_letters, ascii_uppercase, printable
 
-monogram = ngram_score('english_monograms.txt')
-quadgram = ngram_score('english_quadgrams.txt')
+
+'''
+Allows scoring of text using n-gram probabilities
+17/07/12
+'''
+class ngram_score(object):
+    def __init__(self,ngramfile,sep=' '):
+        ''' load a file containing ngrams and counts, calculate log probabilities '''
+        self.ngrams = {}
+        with open(ngramfile) as f:
+            for line in f:
+                key,count = line.split(sep) 
+                self.ngrams[key] = int(count)
+        self.L = len(key)
+        self.N = sum(self.ngrams.values())
+        #calculate log probabilities
+        for key in self.ngrams.keys():
+            self.ngrams[key] = log10(float(self.ngrams[key])/self.N)
+        self.floor = log10(0.01/self.N)
+
+    def score(self,text):
+        ''' normalization '''
+        text = text.upper()
+        text = text.replace(' ', '')
+
+        ''' compute the score of text '''
+        score = 0
+        ngrams = self.ngrams.__getitem__
+        for i in range(len(text)-self.L+1):
+            if text[i:i+self.L] in self.ngrams: score += ngrams(text[i:i+self.L])
+            else: score += self.floor          
+        return score
+
+crypto_dir = os.path.expanduser('~/crypto')
+monogram = ngram_score(os.path.join(crypto_dir, 'english_monograms.txt'))
+quadgram = ngram_score(os.path.join(crypto_dir, 'english_quadgrams.txt'))
 
 def hex_to_b64(hex_str):
     return b64encode(bytes.fromhex(hex_str)).decode()
